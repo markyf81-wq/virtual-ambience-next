@@ -1,4 +1,5 @@
 import { useId, type CSSProperties } from 'react';
+import { Lock } from 'lucide-react';
 
 type SliderProps = {
   label: string;
@@ -35,7 +36,11 @@ export default function Slider({
       <span>
         <span>{label}</span>
         <output htmlFor={id} aria-live="off">
-          {live && <small className="live-label">Auto</small>}
+          {live && (
+            <small className="live-label" title="Turn Auto mode off to adjust manually.">
+              <Lock size={9} aria-hidden="true" /> Auto
+            </small>
+          )}
           {displayValue}%
         </output>
       </span>
@@ -49,7 +54,7 @@ export default function Slider({
         disabled={live || disabled}
         aria-label={label}
         aria-valuetext={`${displayValue}%${live ? ', controlled by Auto mode' : ''}`}
-        title={live ? 'Controlled by Auto mode.' : undefined}
+        title={live ? 'Controlled by Auto mode. Turn Auto mode off to adjust manually.' : undefined}
         style={{ '--fill': `${progress}%` } as CSSProperties}
         onChange={(event) => onChange(Number(event.target.value))}
       />

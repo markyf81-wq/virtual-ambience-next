@@ -32,7 +32,7 @@ export default function Scenery({ scene, small = false }: { scene: string; small
   const night = scene === 'night' || scene === 'campsite' || scene === 'jungle';
   const rain = scene === 'storm' || scene === 'downpour' || scene === 'jungle';
   const ridge = scene === 'ridge';
-  const wetland = scene === 'wetland';
+  const wetland = scene === 'night' || scene === 'wetland';
   return (
     <svg
       className={`scenery ${small ? 'small' : ''}`}

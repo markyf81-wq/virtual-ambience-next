@@ -30,10 +30,12 @@ export default function SoundLayer({
   const showAutoValues = autoEnabled && !layer.muted;
   const showLive = showAutoValues && (playing || Boolean(values));
   const updating = showAutoValues && playing && values?.updating === true;
+  const loopPlaying =
+    sound.kind === 'loop' && playing && !layer.muted && (values?.volume ?? 0) > 0.1;
   return (
     <div className={`sound-layer ${layer.muted ? 'muted' : ''}`}>
       <div className="layer-top">
-        <span className={`sound-icon ${active ? 'event-active' : ''}`}>
+        <span className={`sound-icon ${active || loopPlaying ? 'event-active' : ''}`}>
           <SoundIcon name={sound.icon} />
         </span>
         <div className="layer-name">
