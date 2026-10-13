@@ -24,6 +24,20 @@ function Pine({ x, y, size, color }: { x: number; y: number; size: number; color
   );
 }
 export default function Scenery({ scene, small = false }: { scene: string; small?: boolean }) {
+  if (scene === 'blank') {
+    return (
+      <svg
+        className={`scenery ${small ? 'small' : ''}`}
+        viewBox="0 0 1000 500"
+        preserveAspectRatio="xMidYMid slice"
+        aria-hidden="true"
+      >
+        <rect width="1000" height="500" fill="#243b36" />
+        <circle cx="725" cy="110" r="135" fill="#bed8a1" opacity=".04" />
+        <circle cx="725" cy="110" r="210" fill="none" stroke="#bed8a1" opacity=".05" />
+      </svg>
+    );
+  }
   const collection = scenes.find((preset) => preset.id === scene)?.collection ?? 'nature';
   if (collection !== 'nature') {
     return <CollectionScenery collection={collection} scene={scene} small={small} />;

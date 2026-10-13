@@ -35,3 +35,5 @@ Converted from OGG to LAME VBR quality 2 MP3 at 48 kHz, retaining mono/stereo ch
 | Pulsar signal        | Space      | `Sounds/space_pulsar.ogg`            |
 
 Source creator and license information was not included with these files.
+
+The fire engine siren uses the repeated siren passage from 55.5 seconds to the end of `vehicle_fire_truck.ogg`, with a 180 Hz high-pass filter to reduce engine rumble and a short wrap crossfade. The long steady-tone sections are omitted so a random loop starting point still lands on the siren passage. Its sound ID remains `Urban_Fire-Truck`; the revised asset is `Urban_Fire-Truck-Siren.mp3`.

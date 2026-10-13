@@ -28,6 +28,7 @@ import {
   soundById,
   MAX_LAYERS,
   scenes,
+  blankScene,
   collections,
   sceneMix,
   makeLayer,
@@ -75,7 +76,10 @@ export default function App() {
   playingRef.current = playing;
   const requestRef = useRef(0);
   const importRef = useRef<HTMLInputElement>(null);
-  const scene = scenes.find((s) => s.id === mix.sceneId) ?? scenes[0];
+  const scene =
+    mix.sceneId === blankScene.id
+      ? blankScene
+      : (scenes.find((s) => s.id === mix.sceneId) ?? scenes[0]);
   const visibleScenes = scenes.filter((s) => s.collection === sceneCollection);
   const activeCollectionScenes = scenes.filter((s) => s.collection === scene.collection);
   const activeCollection = collections.find((collection) => collection.id === scene.collection)!;
@@ -185,6 +189,14 @@ export default function App() {
   }
   function chooseScene(id: string) {
     const next = sceneMix(id);
+    if (!next.layers.length) {
+      ++requestRef.current;
+      engine.pause();
+      setPlaying(false);
+      setLoading(false);
+      setDeadline(null);
+      setRemaining(0);
+    }
     setMix({
       ...next,
       master: mix.master,
@@ -516,15 +528,14 @@ export default function App() {
               </div>
               <div className="scene-footer">
                 <span>
-                  <SoundIcon name={activeCollection.icon} size={15} /> {activeCollection.name} ·{' '}
+                  <SoundIcon name={activeCollection.icon} size={15} />{' '}
+                  {scene.id === blankScene.id ? 'Your mix' : activeCollection.name} ·{' '}
                   {mix.layers.length} sound layers
                 </span>
                 <span className="scene-coordinate">
-                  {String(activeCollectionScenes.findIndex((s) => s.id === scene.id) + 1).padStart(
-                    2,
-                    '0',
-                  )}{' '}
-                  / {String(activeCollectionScenes.length).padStart(2, '0')}
+                  {scene.id === blankScene.id
+                    ? 'Start fresh'
+                    : `${String(activeCollectionScenes.findIndex((s) => s.id === scene.id) + 1).padStart(2, '0')} / ${String(activeCollectionScenes.length).padStart(2, '0')}`}
                 </span>
               </div>
             </div>
@@ -537,6 +548,14 @@ export default function App() {
                 {visibleScenes.filter((scene) => !scene.allSounds).length} little escapes
               </span>
             </div>
+            <button
+              className="text-button blank-preset"
+              onClick={() => chooseScene(blankScene.id)}
+              aria-pressed={mix.sceneId === blankScene.id}
+              title="Clear all sounds and start a blank soundscape"
+            >
+              <Plus size={14} /> Start blank
+            </button>
             <CollectionPicker
               label="Scene collection"
               value={sceneCollection}

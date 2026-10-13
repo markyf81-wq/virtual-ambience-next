@@ -449,6 +449,16 @@ export const scenes: Scene[] = [
   ...spaceScenes.map((scene): Scene => ({ ...scene, collection: 'space' })),
 ];
 
+export const blankScene: Scene = {
+  id: 'blank',
+  name: 'Blank soundscape',
+  collection: 'nature',
+  eyebrow: 'MAKE A PLACE OF YOUR OWN',
+  description: 'Add ambience loops and sound effects to build your own soundscape.',
+  tag: 'Start fresh',
+  layers: [],
+};
+
 // Old saved mixes keep their sound settings and use the closest consolidated scene.
 const sceneAliases: Record<string, string> = {
   dusk: 'night',
@@ -465,12 +475,14 @@ const sceneAliases: Record<string, string> = {
 };
 function resolveSceneId(id: unknown): string {
   if (typeof id !== 'string') return 'forest';
+  if (id === blankScene.id) return id;
   const resolved = sceneAliases[id] ?? id;
   return scenes.some((scene) => scene.id === resolved) ? resolved : 'forest';
 }
 
 export function sceneMix(id: string): Mix {
-  const scene = scenes.find((s) => s.id === resolveSceneId(id)) ?? scenes[0];
+  const resolved = resolveSceneId(id);
+  const scene = resolved === blankScene.id ? blankScene : scenes.find((s) => s.id === resolved)!;
   const layers = scene.layers.map(([sound, volume, settings]) => {
     const layer = { ...makeLayer(sound, volume), ...settings };
     if (scene.allSounds && soundById.get(layer.soundId)?.kind === 'effect') {

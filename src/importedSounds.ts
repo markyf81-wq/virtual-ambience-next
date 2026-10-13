@@ -79,7 +79,7 @@ export const importedSounds: Sound[] = [
     collection: 'urban',
     category: 'Vehicles',
     kind: 'loop',
-    file: '/audio/urban/loops/Urban_Fire-Truck.mp3',
+    file: '/audio/urban/loops/Urban_Fire-Truck-Siren.mp3',
     icon: 'siren',
   },
   {
