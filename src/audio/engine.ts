@@ -47,7 +47,12 @@ export class AmbienceEngine {
   private buffers = new Map<string, Promise<AudioBuffer>>();
   private mix?: Mix;
   private pendingAutoValues = new Map<string, AutoValues>();
-  private previewPlayback?: { source: AudioBufferSourceNode; gain: GainNode };
+  private previewPlayback?: {
+    source: AudioBufferSourceNode;
+    gain: GainNode;
+    loop: boolean;
+    volume: number;
+  };
   private previewLayerId?: string;
   private previewRevision = 0;
   private revision = 0;
@@ -91,6 +96,8 @@ export class AmbienceEngine {
     const wasAuto = this.mix?.evolveEnabled ?? previousEvolution > 0;
     this.mix = mix;
     this.reconcilePendingValues(mix);
+    if (this.context && this.previewLayerId && !this.running)
+      this.master!.gain.setTargetAtTime((mix.master / 100) * 0.65, this.context.currentTime, 0.03);
     if (!this.context || !this.running) {
       this.publishPendingValues();
       return;
@@ -274,6 +281,7 @@ export class AmbienceEngine {
     channel.change = Math.max(channel.change, now + LOOP_AUTO_FADE_SECONDS);
   }
   private publishPendingValues() {
+    this.updateLoopPreviewVolume();
     const values: LiveValues = {};
     for (const [id, value] of this.pendingAutoValues)
       values[id] = {
@@ -341,6 +349,7 @@ export class AmbienceEngine {
     }
   }
   private publishValues() {
+    this.updateLoopPreviewVolume();
     const values: LiveValues = {};
     const now = this.context!.currentTime;
     for (const [id, c] of this.channels)
@@ -517,6 +526,24 @@ export class AmbienceEngine {
     }
     this.onPreview?.(null);
   }
+  private loopPreviewVolume(layer: Layer, mix: Mix) {
+    if (mix.evolveEnabled && !layer.muted) {
+      const channel = this.channels.get(layer.id);
+      if (this.running && channel) return channel.gain.gain.value * 100;
+      return this.pendingAutoValues.get(layer.id)?.volume ?? layer.volume;
+    }
+    return layer.volume;
+  }
+  private updateLoopPreviewVolume() {
+    const playback = this.previewPlayback;
+    if (!playback?.loop || !this.context || !this.mix) return;
+    const layer = this.mix.layers.find((item) => item.id === this.previewLayerId);
+    if (!layer) return;
+    const volume = this.loopPreviewVolume(layer, this.mix) / 100;
+    if (Math.abs(volume - playback.volume) < 0.0005) return;
+    playback.volume = volume;
+    playback.gain.gain.setTargetAtTime(volume, this.context.currentTime, 0.03);
+  }
   async preview(layer: Layer, mix: Mix) {
     this.stopPreview();
     const revision = this.previewRevision;
@@ -530,32 +557,41 @@ export class AmbienceEngine {
       if (revision !== this.previewRevision) return;
       const gain = this.context!.createGain();
       gain.gain.value = 1;
-      gain.connect(this.master!);
       let source: AudioBufferSourceNode;
+      let envelope: GainNode | undefined;
+      const loop = soundById.get(layer.soundId)?.kind === 'loop';
+      let volume = 1;
       const finished = () => {
         source.disconnect();
         gain.disconnect();
+        envelope?.disconnect();
         if (this.previewPlayback?.source === source) {
           this.previewPlayback = undefined;
           this.previewLayerId = undefined;
           this.onPreview?.(null);
         }
       };
-      if (soundById.get(layer.soundId)?.kind === 'loop') {
+      if (loop) {
         source = this.context!.createBufferSource();
         const now = this.context!.currentTime;
-        const volume = layer.volume / 100;
+        const currentLayer = this.mix?.layers.find((item) => item.id === layer.id) ?? layer;
+        volume = this.loopPreviewVolume(currentLayer, this.mix ?? mix) / 100;
         source.buffer = buffer;
-        source.loop = true;
         source.connect(gain);
-        gain.gain.setValueAtTime(0, now);
-        gain.gain.linearRampToValueAtTime(volume, now + 0.03);
-        gain.gain.setValueAtTime(volume, now + 9.85);
-        gain.gain.linearRampToValueAtTime(0, now + 10);
+        gain.gain.setValueAtTime(volume, now);
+        // Keep the edge fades separate so volume can follow the slider throughout the preview.
+        envelope = this.context!.createGain();
+        gain.connect(envelope);
+        envelope.connect(this.master!);
+        const fade = Math.min(0.03, buffer.duration / 2);
+        envelope.gain.setValueAtTime(0, now);
+        envelope.gain.linearRampToValueAtTime(1, now + fade);
+        envelope.gain.setValueAtTime(1, now + buffer.duration - fade);
+        envelope.gain.linearRampToValueAtTime(0, now + buffer.duration);
         source.onended = finished;
         source.start(now);
-        source.stop(now + 10);
       } else {
+        gain.connect(this.master!);
         const channel: Channel = {
           gain,
           buffer,
@@ -569,7 +605,7 @@ export class AmbienceEngine {
         };
         source = this.voice(channel, this.context!.currentTime, true, finished)!;
       }
-      this.previewPlayback = { source, gain };
+      this.previewPlayback = { source, gain, loop, volume };
       this.onPreview?.(layer.id);
     } catch (error) {
       if (revision !== this.previewRevision) return;

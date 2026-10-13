@@ -227,7 +227,7 @@ export default function SoundLayer({
                   previewing
                     ? 'Stop this preview'
                     : sound.kind === 'loop'
-                      ? 'Preview up to 10 seconds'
+                      ? 'Preview one complete loop'
                       : undefined
                 }
               >
