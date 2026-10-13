@@ -14,11 +14,13 @@ function releaseAudio(audio: HTMLAudioElement) {
 
 export default function LibrarySounds({
   sounds,
+  emptyMessage = 'No sounds match your search.',
   master,
   onAdd,
   onError,
 }: {
   sounds: Sound[];
+  emptyMessage?: string;
   master: number;
   onAdd: (sound: Sound) => void;
   onError: (message: string) => void;
@@ -111,7 +113,7 @@ export default function LibrarySounds({
           </div>
         );
       })}
-      {!sounds.length && <p className="empty-state">No sounds match your search.</p>}
+      {!sounds.length && <p className="empty-state">{emptyMessage}</p>}
     </div>
   );
 }

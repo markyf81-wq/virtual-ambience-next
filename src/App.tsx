@@ -67,6 +67,7 @@ export default function App() {
   const [remaining, setRemaining] = useState(0);
   const [activeEvents, setActiveEvents] = useState<string[]>([]);
   const [liveValues, setLiveValues] = useState<LiveValues>({});
+  const [previewingId, setPreviewingId] = useState<string | null>(null);
   const engineRef = useRef<AmbienceEngine | null>(null);
   if (!engineRef.current) engineRef.current = new AmbienceEngine();
   const engine = engineRef.current;
@@ -108,12 +109,14 @@ export default function App() {
   }, [mix, engine]);
   useEffect(() => {
     engine.onValues = setLiveValues;
+    engine.onPreview = setPreviewingId;
     engine.onEvent = (id) => {
       setActiveEvents((prev) => [...prev.filter((i) => i !== id), id]);
       setTimeout(() => setActiveEvents((prev) => prev.filter((i) => i !== id)), 1800);
     };
     return () => {
       engine.onValues = undefined;
+      engine.onPreview = undefined;
       engine.onEvent = undefined;
       engine.dispose();
     };
@@ -207,12 +210,20 @@ export default function App() {
     history.replaceState(null, '', location.pathname + location.search);
   }
   function addSound(sound: Sound) {
+    if (mix.layers.some((layer) => layer.soundId === sound.id)) {
+      setToast(`${sound.name} is already in your mix.`);
+      return;
+    }
     if (mix.layers.length >= MAX_LAYERS) {
       setToast(`Your scene can hold up to ${MAX_LAYERS} layers.`);
       return;
     }
     const layer = makeLayer(sound.id, sound.kind === 'effect' ? 40 : 30);
-    setMix((m) => ({ ...m, layers: [...m.layers, layer] }));
+    setMix((m) =>
+      m.layers.some((existing) => existing.soundId === sound.id) || m.layers.length >= MAX_LAYERS
+        ? m
+        : { ...m, layers: [...m.layers, layer] },
+    );
     setLayerTab(sound.kind);
     setModal(null);
     setToast(`${sound.name} added`);
@@ -254,6 +265,10 @@ export default function App() {
     }
   }
   async function preview(layer: Layer) {
+    if (previewingId === layer.id) {
+      engine.stopPreview();
+      return;
+    }
     setError('');
     try {
       await engine.preview(layer, mix);
@@ -261,7 +276,9 @@ export default function App() {
       setError(e instanceof Error ? e.message : 'Could not preview this sound.');
     }
   }
-  const collectionSounds = sounds.filter(
+  const addedSoundIds = new Set(mix.layers.map((layer) => layer.soundId));
+  const availableSounds = sounds.filter((sound) => !addedSoundIds.has(sound.id));
+  const collectionSounds = availableSounds.filter(
     (sound) => sound.collection === libraryCollection && sound.kind === layerTab,
   );
   const categories = ['All', ...new Set(collectionSounds.map((sound) => sound.category))];
@@ -473,6 +490,7 @@ export default function App() {
                     playing={playing}
                     liveValues={liveValues}
                     activeEvents={activeEvents}
+                    previewingId={previewingId}
                     onChange={patchLayer}
                     onPreview={preview}
                     onRemove={(id) =>
@@ -654,7 +672,7 @@ export default function App() {
             counts={Object.fromEntries(
               collections.map((collection) => [
                 collection.id,
-                sounds.filter(
+                availableSounds.filter(
                   (sound) => sound.collection === collection.id && sound.kind === layerTab,
                 ).length,
               ]),
@@ -682,13 +700,18 @@ export default function App() {
           </div>
           <LibrarySounds
             sounds={filtered}
+            emptyMessage={
+              collectionSounds.length
+                ? 'No sounds match your search.'
+                : `All ${layerTab === 'loop' ? 'loops' : 'sound effects'} in this collection are already in your mix.`
+            }
             master={mix.master}
             onAdd={addSound}
             onError={setError}
           />
           <p className="modal-footnote">
-            {collectionSounds.length} {layerTab === 'loop' ? 'ambience loops' : 'sound effects'}.
-            Preview up to 10 seconds before adding.
+            {collectionSounds.length} {layerTab === 'loop' ? 'ambience loops' : 'sound effects'}{' '}
+            available. Preview up to 10 seconds before adding.
           </p>
         </Modal>
       )}

@@ -518,8 +518,12 @@ export function parseMix(value: unknown): Mix | null {
   const num = (v: unknown, d: number, a: number, b: number) =>
     typeof v === 'number' && Number.isFinite(v) ? Math.max(a, Math.min(b, v)) : d;
   const layers: Layer[] = [];
+  const soundIds = new Set<string>();
   for (const item of m.layers) {
     if (!item || typeof item !== 'object' || !soundById.has(item.soundId)) return null;
+    // Old exports may contain duplicate layers; retain the first one's settings.
+    if (soundIds.has(item.soundId)) continue;
+    soundIds.add(item.soundId);
     const l = makeLayer(item.soundId);
     const volume = num(item.volume, 45, 0, 100);
     const effectMin = num(item.effectMin, Math.round(volume * 0.7), 0, 100);

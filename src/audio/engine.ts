@@ -47,10 +47,14 @@ export class AmbienceEngine {
   private buffers = new Map<string, Promise<AudioBuffer>>();
   private mix?: Mix;
   private pendingAutoValues = new Map<string, AutoValues>();
+  private previewPlayback?: { source: AudioBufferSourceNode; gain: GainNode };
+  private previewLayerId?: string;
+  private previewRevision = 0;
   private revision = 0;
   private running = false;
   onEvent?: (id: string) => void;
   onValues?: (values: LiveValues) => void;
+  onPreview?: (id: string | null) => void;
   private init() {
     if (this.context) return;
     this.context = new AudioContext();
@@ -81,6 +85,8 @@ export class AmbienceEngine {
     }
   }
   async sync(mix: Mix) {
+    if (this.previewLayerId && !mix.layers.some((layer) => layer.id === this.previewLayerId))
+      this.stopPreview();
     const previousEvolution = this.mix?.evolution ?? 0;
     const wasAuto = this.mix?.evolveEnabled ?? previousEvolution > 0;
     this.mix = mix;
@@ -354,6 +360,7 @@ export class AmbienceEngine {
     this.onValues?.(values);
   }
   pause() {
+    this.stopPreview();
     this.running = false;
     ++this.revision;
     for (const c of this.channels.values()) this.retire(c);
@@ -445,7 +452,7 @@ export class AmbienceEngine {
     this.keepLoopAudible();
     this.publishValues();
   }
-  private voice(c: Channel, time: number, preview = false) {
+  private voice(c: Channel, time: number, preview = false, onEnded?: () => void) {
     const context = this.context!,
       l = c.config;
     if (c.sources.size >= 4) return;
@@ -482,6 +489,7 @@ export class AmbienceEngine {
       source.disconnect();
       gain.disconnect();
       panner?.disconnect();
+      onEnded?.();
     };
     source.start(time);
     if (!preview)
@@ -491,28 +499,83 @@ export class AmbienceEngine {
         },
         Math.max(0, (time - context.currentTime) * 1000),
       );
+    return source;
+  }
+  stopPreview() {
+    ++this.previewRevision;
+    const playback = this.previewPlayback;
+    this.previewPlayback = undefined;
+    this.previewLayerId = undefined;
+    if (playback && this.context) {
+      const now = this.context.currentTime;
+      const gain = playback.gain.gain;
+      const volume = gain.value;
+      gain.cancelScheduledValues(now);
+      gain.setValueAtTime(volume, now);
+      gain.linearRampToValueAtTime(0, now + 0.03);
+      playback.source.stop(now + 0.03);
+    }
+    this.onPreview?.(null);
   }
   async preview(layer: Layer, mix: Mix) {
-    this.init();
-    await this.context!.resume();
-    this.master!.gain.setTargetAtTime((mix.master / 100) * 0.65, this.context!.currentTime, 0.1);
-    const buffer = await this.load(layer.soundId);
-    const gain = this.context!.createGain();
-    gain.gain.value = 1;
-    gain.connect(this.master!);
-    const c: Channel = {
-      gain,
-      buffer,
-      config: layer,
-      activityRate: layer.rate,
-      activityTarget: layer.rate,
-      activityAt: this.context!.currentTime,
-      sources: new Set(),
-      next: Infinity,
-      change: Infinity,
-    };
-    this.voice(c, this.context!.currentTime, true);
-    setTimeout(() => gain.disconnect(), (buffer.duration / (1 - layer.pitch / 100) + 1) * 1000);
+    this.stopPreview();
+    const revision = this.previewRevision;
+    this.previewLayerId = layer.id;
+    try {
+      this.init();
+      await this.context!.resume();
+      if (revision !== this.previewRevision) return;
+      this.master!.gain.setTargetAtTime((mix.master / 100) * 0.65, this.context!.currentTime, 0.1);
+      const buffer = await this.load(layer.soundId);
+      if (revision !== this.previewRevision) return;
+      const gain = this.context!.createGain();
+      gain.gain.value = 1;
+      gain.connect(this.master!);
+      let source: AudioBufferSourceNode;
+      const finished = () => {
+        source.disconnect();
+        gain.disconnect();
+        if (this.previewPlayback?.source === source) {
+          this.previewPlayback = undefined;
+          this.previewLayerId = undefined;
+          this.onPreview?.(null);
+        }
+      };
+      if (soundById.get(layer.soundId)?.kind === 'loop') {
+        source = this.context!.createBufferSource();
+        const now = this.context!.currentTime;
+        const volume = layer.volume / 100;
+        source.buffer = buffer;
+        source.loop = true;
+        source.connect(gain);
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(volume, now + 0.03);
+        gain.gain.setValueAtTime(volume, now + 9.85);
+        gain.gain.linearRampToValueAtTime(0, now + 10);
+        source.onended = finished;
+        source.start(now);
+        source.stop(now + 10);
+      } else {
+        const channel: Channel = {
+          gain,
+          buffer,
+          config: layer,
+          activityRate: layer.rate,
+          activityTarget: layer.rate,
+          activityAt: this.context!.currentTime,
+          sources: new Set(),
+          next: Infinity,
+          change: Infinity,
+        };
+        source = this.voice(channel, this.context!.currentTime, true, finished)!;
+      }
+      this.previewPlayback = { source, gain };
+      this.onPreview?.(layer.id);
+    } catch (error) {
+      if (revision !== this.previewRevision) return;
+      this.stopPreview();
+      throw error;
+    }
   }
   private load(id: string): Promise<AudioBuffer> {
     if (this.buffers.has(id)) return this.buffers.get(id)!;

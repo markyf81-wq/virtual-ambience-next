@@ -1,4 +1,4 @@
-import { ChevronDown, Headphones, Play, Trash2, Volume2, VolumeX } from 'lucide-react';
+import { ChevronDown, Headphones, Play, Square, Trash2, Volume2, VolumeX } from 'lucide-react';
 import { soundById, type Layer } from './data';
 import type { LiveValues } from './audio/engine';
 import Slider from './Slider';
@@ -11,6 +11,7 @@ type SoundLayerProps = {
   playing: boolean;
   values?: LiveValues[string];
   active: boolean;
+  previewing: boolean;
   onChange: (changes: Partial<Layer>) => void;
   onRemove: () => void;
   onPreview: (layer: Layer) => Promise<void>;
@@ -22,6 +23,7 @@ export default function SoundLayer({
   playing,
   values,
   active,
+  previewing,
   onChange,
   onRemove,
   onPreview,
@@ -216,11 +218,22 @@ export default function SoundLayer({
               </label>
             )}
             <div className="sound-actions">
-              {sound.kind === 'effect' && (
-                <button className="text-button" onClick={() => void onPreview(layer)}>
-                  <Play size={13} /> Preview sound
-                </button>
-              )}
+              <button
+                className="text-button"
+                onClick={() => void onPreview(layer)}
+                aria-label={`${previewing ? 'Stop' : 'Preview'} ${sound.name}`}
+                aria-pressed={previewing}
+                title={
+                  previewing
+                    ? 'Stop this preview'
+                    : sound.kind === 'loop'
+                      ? 'Preview up to 10 seconds'
+                      : undefined
+                }
+              >
+                {previewing ? <Square size={13} /> : <Play size={13} />}
+                {previewing ? 'Stop sound' : 'Preview sound'}
+              </button>
               <button className="remove-button" onClick={onRemove}>
                 <Trash2 size={13} /> Remove
               </button>

@@ -9,6 +9,7 @@ type SoundColumnsProps = {
   playing: boolean;
   liveValues: LiveValues;
   activeEvents: string[];
+  previewingId: string | null;
   onChange: (id: string, changes: Partial<Layer>) => void;
   onRemove: (id: string) => void;
   onPreview: (layer: Layer) => Promise<void>;
@@ -22,6 +23,7 @@ export default function SoundColumns({
   playing,
   liveValues,
   activeEvents,
+  previewingId,
   onChange,
   onRemove,
   onPreview,
@@ -53,6 +55,7 @@ export default function SoundColumns({
           playing={playing}
           values={liveValues[layer.id]}
           active={activeEvents.includes(layer.id)}
+          previewing={previewingId === layer.id}
           onChange={(changes) => onChange(layer.id, changes)}
           onRemove={() => onRemove(layer.id)}
           onPreview={onPreview}
