@@ -28,19 +28,23 @@ import {
   soundById,
   MAX_LAYERS,
   scenes,
+  collections,
   sceneMix,
   makeLayer,
   parseMix,
   type Layer,
   type Mix,
   type Sound,
+  type SoundCollection,
 } from './data';
 import { AmbienceEngine, type LiveValues } from './audio/engine';
 import Scenery from './Scenery';
 import Slider from './Slider';
-import SoundLayer from './SoundLayer';
-import SoundIcon from './SoundIcon';
+import SoundColumns from './SoundColumns';
+import LibrarySounds from './LibrarySounds';
 import Modal from './Modal';
+import CollectionPicker from './CollectionPicker';
+import SoundIcon from './SoundIcon';
 import { STORAGE, MAX_SAVED_MIXES, readInitial, readSaved, type Saved } from './storage';
 export default function App() {
   const [mix, setMix] = useState<Mix>(readInitial);
@@ -50,6 +54,10 @@ export default function App() {
   const [modal, setModal] = useState<'library' | 'save' | 'saved' | 'timer' | 'about' | null>(null);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('All');
+  const [sceneCollection, setSceneCollection] = useState<SoundCollection>(
+    () => scenes.find((scene) => scene.id === mix.sceneId)?.collection ?? 'nature',
+  );
+  const [libraryCollection, setLibraryCollection] = useState<SoundCollection>(sceneCollection);
   const [layerTab, setLayerTab] = useState<'loop' | 'effect'>('loop');
   const [toast, setToast] = useState('');
   const [error, setError] = useState('');
@@ -68,6 +76,15 @@ export default function App() {
   const requestRef = useRef(0);
   const importRef = useRef<HTMLInputElement>(null);
   const scene = scenes.find((s) => s.id === mix.sceneId) ?? scenes[0];
+  const visibleScenes = scenes.filter((s) => s.collection === sceneCollection);
+  const activeCollectionScenes = scenes.filter((s) => s.collection === scene.collection);
+  const activeCollection = collections.find((collection) => collection.id === scene.collection)!;
+  useEffect(() => {
+    const collection = scenes.find((s) => s.id === mix.sceneId)?.collection ?? 'nature';
+    setSceneCollection(collection);
+    setLibraryCollection(collection);
+    setCategory('All');
+  }, [mix.sceneId]);
   useEffect(() => {
     const id = setTimeout(() => {
       try {
@@ -232,18 +249,15 @@ export default function App() {
       setError(e instanceof Error ? e.message : 'Could not preview this sound.');
     }
   }
-  const categories = [
-    'All',
-    ...['Weather', 'Water', 'Birds', 'Wildlife', 'Other'].filter((c) =>
-      sounds.some((s) => s.kind === layerTab && s.category === c),
-    ),
-  ];
+  const collectionSounds = sounds.filter(
+    (sound) => sound.collection === libraryCollection && sound.kind === layerTab,
+  );
+  const categories = ['All', ...new Set(collectionSounds.map((sound) => sound.category))];
   const visibleLayers = mix.layers.filter((l) => soundById.get(l.soundId)?.kind === layerTab);
   const loopCount = mix.layers.filter((l) => soundById.get(l.soundId)?.kind === 'loop').length;
   const effectCount = mix.layers.length - loopCount;
-  const filtered = sounds.filter(
+  const filtered = collectionSounds.filter(
     (s) =>
-      s.kind === layerTab &&
       (category === 'All' || s.category === category) &&
       s.name.toLowerCase().includes(query.toLowerCase()),
   );
@@ -285,129 +299,7 @@ export default function App() {
           </p>
         </div>
         <div className="workspace">
-          <section className="scene-column" aria-label="Soundscape">
-            <div className={`scene-stage scene-${scene.id}`}>
-              <Scenery scene={scene.id} />
-              <div className="scene-overlay" />
-              <div className="scene-topline">
-                <span className="scene-badge">
-                  <span className={playing ? 'live-dot playing' : 'live-dot'} />
-                  {playing ? 'SCENE IS LIVE' : 'A MOMENT OF STILLNESS'}
-                </span>
-                <span className="headphone-badge">
-                  <Headphones size={14} /> Best with headphones
-                </span>
-              </div>
-              <div className="scene-title">
-                <span className="eyebrow">{scene.eyebrow}</span>
-                <h2>{mix.name}</h2>
-                <p>{scene.description}</p>
-              </div>
-              <div className="scene-footer">
-                <span>
-                  <Leaf size={15} /> {mix.layers.length} layers · An ever-changing soundscape
-                </span>
-                <span className="scene-coordinate">
-                  0{scenes.findIndex((s) => s.id === mix.sceneId) + 1} /{' '}
-                  {String(scenes.length).padStart(2, '0')}
-                </span>
-              </div>
-            </div>
-            <div className="transport">
-              <button
-                className={`play-button ${playing ? 'is-playing' : ''}`}
-                onClick={() => void togglePlayback()}
-                aria-label={
-                  loading ? 'Cancel loading' : playing ? 'Pause soundscape' : 'Play soundscape'
-                }
-              >
-                {loading ? (
-                  <span className="spinner" />
-                ) : playing ? (
-                  <Pause size={21} fill="currentColor" />
-                ) : (
-                  <Play size={21} fill="currentColor" />
-                )}
-              </button>
-              <div className="transport-label">
-                <strong>
-                  {loading
-                    ? 'Preparing your escape…'
-                    : playing
-                      ? 'You’re a little elsewhere.'
-                      : 'Take a breath. Press play.'}
-                </strong>
-                <span>
-                  {loading
-                    ? 'Loading your selected sounds'
-                    : playing
-                      ? 'Stay as long as you like'
-                      : 'Your soundscape is ready when you are'}
-                </span>
-              </div>
-              <div className="master-control">
-                <Slider
-                  label="Master volume"
-                  value={mix.master}
-                  onChange={(master) => patch({ master })}
-                />
-              </div>
-              <button
-                className={`timer-button ${deadline ? 'timer-active' : ''}`}
-                onClick={() => setModal('timer')}
-                aria-label="Sleep timer"
-              >
-                <Clock3 size={18} />
-                <span>
-                  {deadline
-                    ? `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`
-                    : 'Timer'}
-                </span>
-              </button>
-            </div>
-            <div className="section-heading">
-              <div>
-                <span className="eyebrow">START SOMEWHERE</span>
-                <h3>A place for every mood</h3>
-              </div>
-              <span className="quiet-label">Seven little escapes</span>
-            </div>
-            <div className="scene-grid">
-              {scenes.map((s, i) => (
-                <button
-                  className={`preset ${s.id === mix.sceneId ? 'selected' : ''}`}
-                  key={s.id}
-                  onClick={() => chooseScene(s.id)}
-                  aria-pressed={s.id === mix.sceneId}
-                >
-                  <div className="preset-image">
-                    <Scenery scene={s.id} small />
-                    {s.id === mix.sceneId && (
-                      <span className="preset-check">
-                        <Check size={13} />
-                      </span>
-                    )}
-                    <span className="preset-number">0{i + 1}</span>
-                  </div>
-                  <div className="preset-info">
-                    <strong>{s.name}</strong>
-                    <span>{s.tag}</span>
-                  </div>
-                </button>
-              ))}
-            </div>
-            <div className="slow-note">
-              <span className="small-orbit">
-                <Leaf size={17} />
-              </span>
-              <p>
-                No two moments sound quite the same.
-                <br />
-                <span>Your scene gently changes as you listen.</span>
-              </p>
-            </div>
-          </section>
-          <aside className="mixer">
+          <section className="mixer" aria-label="Sound controls">
             <div className="mixer-title">
               <div>
                 <span className="eyebrow">MAKE THIS PLACE YOURS</span>
@@ -424,47 +316,101 @@ export default function App() {
                 <RotateCcw size={16} />
               </button>
             </div>
-            <div className="evolution-control">
-              <div className="auto-mode-header">
-                <label className="switch-row evolve-toggle">
+            <div className="top-controls">
+              <div className="transport">
+                <button
+                  className={`play-button ${playing ? 'is-playing' : ''}`}
+                  onClick={() => void togglePlayback()}
+                  aria-label={
+                    loading ? 'Cancel loading' : playing ? 'Pause soundscape' : 'Play soundscape'
+                  }
+                >
+                  {loading ? (
+                    <span className="spinner" />
+                  ) : playing ? (
+                    <Pause size={21} fill="currentColor" />
+                  ) : (
+                    <Play size={21} fill="currentColor" />
+                  )}
+                </button>
+                <div className="transport-label">
+                  <strong>
+                    {loading
+                      ? 'Preparing your escape…'
+                      : playing
+                        ? 'You’re a little elsewhere.'
+                        : 'Take a breath. Press play.'}
+                  </strong>
                   <span>
-                    <Sparkles size={16} />
-                    <strong>Auto mode</strong>
-                    <small>
-                      {mix.evolveEnabled
-                        ? mix.evolution < 40
-                          ? 'Gentle'
-                          : mix.evolution < 75
-                            ? 'Wandering'
-                            : 'Lively'
-                        : 'Off'}
-                    </small>
+                    {loading
+                      ? 'Loading your selected sounds'
+                      : playing
+                        ? 'Stay as long as you like'
+                        : 'Your soundscape is ready when you are'}
                   </span>
-                  <input
-                    type="checkbox"
-                    aria-label="Auto mode"
-                    checked={mix.evolveEnabled}
-                    onChange={(e) => patch({ evolveEnabled: e.target.checked })}
+                </div>
+                <div className="master-control">
+                  <Slider
+                    label="Master volume"
+                    value={mix.master}
+                    onChange={(master) => patch({ master })}
                   />
-                </label>
-                {mix.evolveEnabled && (
-                  <button
-                    className="randomise-button"
-                    disabled={loading}
-                    onClick={() => engine.randomiseAuto(mix)}
-                    title="Randomise loop volumes and effect frequencies within their limits"
-                  >
-                    <Shuffle size={13} /> Randomise
-                  </button>
-                )}
+                </div>
+                <button
+                  className={`timer-button ${deadline ? 'timer-active' : ''}`}
+                  onClick={() => setModal('timer')}
+                  aria-label="Sleep timer"
+                >
+                  <Clock3 size={18} />
+                  <span>
+                    {deadline
+                      ? `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`
+                      : 'Timer'}
+                  </span>
+                </button>
               </div>
-              <Slider
-                label="Auto mode intensity"
-                min={1}
-                value={mix.evolution}
-                disabled={!mix.evolveEnabled}
-                onChange={(evolution) => patch({ evolution })}
-              />
+              <div className="evolution-control">
+                <div className="auto-mode-header">
+                  <label className="switch-row evolve-toggle">
+                    <span>
+                      <Sparkles size={16} />
+                      <strong>Auto mode</strong>
+                      <small>
+                        {mix.evolveEnabled
+                          ? mix.evolution < 40
+                            ? 'Gentle'
+                            : mix.evolution < 75
+                              ? 'Wandering'
+                              : 'Lively'
+                          : 'Off'}
+                      </small>
+                    </span>
+                    <input
+                      type="checkbox"
+                      aria-label="Auto mode"
+                      checked={mix.evolveEnabled}
+                      onChange={(e) => patch({ evolveEnabled: e.target.checked })}
+                    />
+                  </label>
+                  {mix.evolveEnabled && (
+                    <button
+                      className="randomise-button"
+                      disabled={loading}
+                      onClick={() => engine.shuffleAuto(mix)}
+                      title="Shuffle loop volumes and effect frequencies within their limits"
+                    >
+                      <Shuffle size={13} /> Shuffle
+                    </button>
+                  )}
+                </div>
+                <Slider
+                  label="Auto mode intensity"
+                  min={1}
+                  value={mix.evolution}
+                  disabled={!mix.evolveEnabled}
+                  onChange={(evolution) => patch({ evolution })}
+                />
+              </div>
             </div>
             <div className="mixer-tabs" role="tablist" aria-label="Sound types">
               <button
@@ -509,21 +455,18 @@ export default function App() {
                     </p>
                   </div>
                 ) : (
-                  visibleLayers.map((layer) => (
-                    <SoundLayer
-                      key={layer.id}
-                      layer={layer}
-                      autoEnabled={mix.evolveEnabled}
-                      playing={playing}
-                      values={liveValues[layer.id]}
-                      active={activeEvents.includes(layer.id)}
-                      onChange={(changes) => patchLayer(layer.id, changes)}
-                      onPreview={preview}
-                      onRemove={() =>
-                        setMix((m) => ({ ...m, layers: m.layers.filter((l) => l.id !== layer.id) }))
-                      }
-                    />
-                  ))
+                  <SoundColumns
+                    layers={visibleLayers}
+                    autoEnabled={mix.evolveEnabled}
+                    playing={playing}
+                    liveValues={liveValues}
+                    activeEvents={activeEvents}
+                    onChange={patchLayer}
+                    onPreview={preview}
+                    onRemove={(id) =>
+                      setMix((m) => ({ ...m, layers: m.layers.filter((layer) => layer.id !== id) }))
+                    }
+                  />
                 )}
               </div>
               <button
@@ -551,6 +494,93 @@ export default function App() {
               <button onClick={() => void share()}>
                 <Share2 size={15} /> Share
               </button>
+            </div>
+          </section>
+          <aside className="scene-column" aria-label="Scene selection">
+            <div className={`scene-stage scene-${scene.id}`}>
+              <Scenery scene={scene.id} />
+              <div className="scene-overlay" />
+              <div className="scene-topline">
+                <span className="scene-badge">
+                  <span className={playing ? 'live-dot playing' : 'live-dot'} />
+                  {playing ? 'SCENE IS LIVE' : 'A MOMENT OF STILLNESS'}
+                </span>
+                <span className="headphone-badge">
+                  <Headphones size={14} /> Best with headphones
+                </span>
+              </div>
+              <div className="scene-title">
+                <span className="eyebrow">{scene.eyebrow}</span>
+                <h2>{mix.name}</h2>
+                <p>{scene.description}</p>
+              </div>
+              <div className="scene-footer">
+                <span>
+                  <SoundIcon name={activeCollection.icon} size={15} /> {activeCollection.name} ·{' '}
+                  {mix.layers.length} sound layers
+                </span>
+                <span className="scene-coordinate">
+                  {String(activeCollectionScenes.findIndex((s) => s.id === scene.id) + 1).padStart(
+                    2,
+                    '0',
+                  )}{' '}
+                  / {String(activeCollectionScenes.length).padStart(2, '0')}
+                </span>
+              </div>
+            </div>
+            <div className="section-heading">
+              <div>
+                <span className="eyebrow">START SOMEWHERE</span>
+                <h3>A place for every mood</h3>
+              </div>
+              <span className="quiet-label">
+                {visibleScenes.filter((scene) => !scene.allSounds).length} little escapes
+              </span>
+            </div>
+            <CollectionPicker
+              label="Scene collection"
+              value={sceneCollection}
+              onChange={setSceneCollection}
+              counts={Object.fromEntries(
+                collections.map((collection) => [
+                  collection.id,
+                  scenes.filter((scene) => scene.collection === collection.id).length,
+                ]),
+              )}
+            />
+            <div className="scene-grid">
+              {visibleScenes.map((s, i) => (
+                <button
+                  className={`preset ${s.id === mix.sceneId ? 'selected' : ''}`}
+                  key={s.id}
+                  onClick={() => chooseScene(s.id)}
+                  aria-pressed={s.id === mix.sceneId}
+                >
+                  <div className="preset-image">
+                    <Scenery scene={s.id} small />
+                    {s.id === mix.sceneId && (
+                      <span className="preset-check">
+                        <Check size={13} />
+                      </span>
+                    )}
+                    <span className="preset-number">{String(i + 1).padStart(2, '0')}</span>
+                  </div>
+                  <div className="preset-info">
+                    <strong>{s.name}</strong>
+                    <span>{s.tag}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+            <div className="slow-note">
+              <span className="small-orbit">
+                <Leaf size={17} />
+              </span>
+              <p>
+                No two moments sound quite the same.
+                <br />
+                <span>Your scene gently changes as you listen.</span>
+              </p>
             </div>
           </aside>
         </div>
@@ -593,8 +623,24 @@ export default function App() {
           <p className="modal-description">
             {layerTab === 'loop'
               ? 'Continuous sounds that surround your scene.'
-              : 'Calls, rustles and thunder that appear at random moments.'}
+              : 'Individual sounds that appear at random moments in your scene.'}
           </p>
+          <CollectionPicker
+            label="Sound collection"
+            value={libraryCollection}
+            onChange={(collection) => {
+              setLibraryCollection(collection);
+              setCategory('All');
+            }}
+            counts={Object.fromEntries(
+              collections.map((collection) => [
+                collection.id,
+                sounds.filter(
+                  (sound) => sound.collection === collection.id && sound.kind === layerTab,
+                ).length,
+              ]),
+            )}
+          />
           <label className="search-box">
             <Search size={18} />
             <input
@@ -615,23 +661,15 @@ export default function App() {
               </button>
             ))}
           </div>
-          <div className="sound-library">
-            {filtered.map((sound) => (
-              <button key={sound.id} className="library-sound" onClick={() => addSound(sound)}>
-                <span className="sound-icon">
-                  <SoundIcon name={sound.icon} />
-                </span>
-                <span>
-                  <strong>{sound.name}</strong>
-                </span>
-                <Plus size={17} />
-              </button>
-            ))}
-            {!filtered.length && <p className="empty-state">No sounds match your search.</p>}
-          </div>
+          <LibrarySounds
+            sounds={filtered}
+            master={mix.master}
+            onAdd={addSound}
+            onError={setError}
+          />
           <p className="modal-footnote">
-            {layerTab === 'loop' ? '11 ambience loops' : '17 sound effects'} from the original
-            Virtual Ambience collection.
+            {collectionSounds.length} {layerTab === 'loop' ? 'ambience loops' : 'sound effects'}.
+            Preview up to 10 seconds before adding.
           </p>
         </Modal>
       )}

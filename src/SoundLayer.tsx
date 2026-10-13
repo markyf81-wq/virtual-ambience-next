@@ -2,6 +2,7 @@ import { ChevronDown, Headphones, Play, Trash2, Volume2, VolumeX } from 'lucide-
 import { soundById, type Layer } from './data';
 import type { LiveValues } from './audio/engine';
 import Slider from './Slider';
+import Knob from './Knob';
 import SoundIcon from './SoundIcon';
 
 type SoundLayerProps = {
@@ -28,6 +29,7 @@ export default function SoundLayer({
   const sound = soundById.get(layer.soundId)!;
   const showAutoValues = autoEnabled && !layer.muted;
   const showLive = showAutoValues && (playing || Boolean(values));
+  const updating = showAutoValues && playing && values?.updating === true;
   return (
     <div className={`sound-layer ${layer.muted ? 'muted' : ''}`}>
       <div className="layer-top">
@@ -53,7 +55,7 @@ export default function SoundLayer({
             value={showAutoValues && values ? values.volume : layer.volume}
             step={showLive ? 0.1 : 1}
             live={showLive}
-            automated={autoEnabled}
+            updating={updating}
             onChange={(volume) => onChange({ volume })}
           />
         ) : (
@@ -64,7 +66,7 @@ export default function SoundLayer({
             }
             step={showLive ? 0.1 : 0.5}
             live={showLive}
-            automated={autoEnabled}
+            updating={updating}
             onChange={(percent) => onChange({ rate: percent / 5 })}
           />
         )}
@@ -110,8 +112,8 @@ export default function SoundLayer({
                 <div className="auto-options-content">
                   {sound.kind === 'loop' ? (
                     <>
-                      <div className="control-group">
-                        <Slider
+                      <div className="auto-knobs">
+                        <Knob
                           label="Min volume"
                           value={layer.min}
                           onChange={(min) =>
@@ -120,7 +122,7 @@ export default function SoundLayer({
                             })
                           }
                         />
-                        <Slider
+                        <Knob
                           label="Max volume"
                           value={layer.max}
                           onChange={(max) =>
@@ -129,7 +131,7 @@ export default function SoundLayer({
                             })
                           }
                         />
-                        <Slider
+                        <Knob
                           label="Chance to silence"
                           value={layer.offChance}
                           onChange={(offChance) => onChange({ offChance })}
@@ -165,9 +167,9 @@ export default function SoundLayer({
                       </fieldset>
                     </>
                   ) : (
-                    <div className="control-group auto-frequency-controls">
-                      <Slider
-                        label="Min auto frequency"
+                    <div className="auto-knobs">
+                      <Knob
+                        label="Min frequency"
                         value={Number((layer.minRate * 5).toFixed(1))}
                         min={0}
                         step={0.5}
@@ -177,8 +179,8 @@ export default function SoundLayer({
                           })
                         }
                       />
-                      <Slider
-                        label="Max auto frequency"
+                      <Knob
+                        label="Max frequency"
                         value={Number((layer.maxRate * 5).toFixed(1))}
                         min={0}
                         step={0.5}
@@ -188,7 +190,7 @@ export default function SoundLayer({
                           })
                         }
                       />
-                      <Slider
+                      <Knob
                         label="Chance to silence"
                         value={layer.offChance}
                         onChange={(offChance) => onChange({ offChance })}

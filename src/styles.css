@@ -152,15 +152,17 @@ h3 {
 }
 .workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 350px;
+  grid-template-columns: minmax(0, 1fr) 340px;
   gap: 26px;
+  align-items: start;
 }
 .scene-stage {
-  height: 384px;
+  height: 270px;
   border-radius: 13px;
   overflow: hidden;
   position: relative;
   border: 1px solid #6a80743b;
+  margin-bottom: 22px;
 }
 .scenery {
   display: block;
@@ -177,9 +179,9 @@ h3 {
 }
 .scene-topline {
   position: absolute;
-  left: 25px;
-  right: 25px;
-  top: 22px;
+  left: 16px;
+  right: 16px;
+  top: 16px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -217,33 +219,34 @@ h3 {
 }
 .scene-title {
   position: absolute;
-  left: 32px;
-  right: 25px;
-  bottom: 76px;
+  left: 20px;
+  right: 20px;
+  bottom: 60px;
 }
 .scene-title .eyebrow {
   color: #dce5cb;
   font-size: 8px;
 }
 .scene-title h2 {
-  font-size: 48px;
-  letter-spacing: -2px;
+  font-size: 30px;
+  letter-spacing: -1px;
   color: #f5f3e6;
   line-height: 1.2;
-  margin: 9px 0 10px;
+  margin: 8px 0;
+  overflow-wrap: anywhere;
 }
 .scene-title p {
-  font-size: 12px;
+  font-size: 11px;
   color: #c6d1c1;
   line-height: 1.6;
 }
 .scene-footer {
   position: absolute;
-  bottom: 22px;
-  left: 32px;
-  right: 30px;
+  bottom: 16px;
+  left: 20px;
+  right: 20px;
   border-top: 1px solid #c0d0b328;
-  padding-top: 15px;
+  padding-top: 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -344,8 +347,8 @@ h3 {
 }
 .scene-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 13px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
 }
 .preset {
   text-align: left;
@@ -459,7 +462,7 @@ h3 {
   letter-spacing: 1.5px;
 }
 .mixer-title h2 {
-  font-size: 20px;
+  font-size: 26px;
   letter-spacing: -0.6px;
   margin-top: 9px;
   display: flex;
@@ -525,11 +528,17 @@ h3 {
 }
 
 .layer-list {
-  padding: 0 22px;
-  max-height: 510px;
-  overflow: auto;
-  scrollbar-width: thin;
-  scrollbar-color: #3c4c3b transparent;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: start;
+  padding: 16px 22px 0;
+}
+.layer-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
 }
 .sound-layer {
   padding: 19px 0 15px;
@@ -879,6 +888,62 @@ input[type='range']::-moz-range-thumb {
 .search-box input::placeholder {
   color: #7d9271;
 }
+.collection-picker {
+  margin: 0 0 16px;
+}
+.collection-label {
+  display: block;
+  margin-bottom: 8px;
+  color: #91a58b;
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.collection-picker > div {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.collection-picker button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px 6px;
+  border: 1px solid #3c4c3b;
+  border-radius: 7px;
+  color: #98ac90;
+  background: #18231e;
+  font-size: 11px;
+}
+.collection-picker button svg {
+  flex-shrink: 0;
+}
+.collection-picker button:hover {
+  border-color: #738c59;
+  color: #d8e7cb;
+}
+.collection-picker .selected {
+  border-color: #829967;
+  background: #30402a;
+  color: #d4e8bc;
+}
+.collection-picker[data-collection='urban'] .selected {
+  border-color: #98774e;
+  background: #3d3326;
+  color: #ebcca2;
+}
+.collection-picker[data-collection='space'] .selected {
+  border-color: #7966a4;
+  background: #30293f;
+  color: #d7c7f5;
+}
+.collection-count {
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
 .category-tabs {
   display: flex;
   gap: 4px;
@@ -907,13 +972,15 @@ input[type='range']::-moz-range-thumb {
 .library-sound {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 4px;
+  min-width: 0;
   border: 1px solid #34472d;
   border-radius: 7px;
-  padding: 10px;
+  padding: 6px;
   text-align: left;
 }
-.library-sound:hover {
+.library-sound:hover,
+.library-sound.previewing {
   background: #2a3b22;
   border-color: #738c59;
 }
@@ -921,8 +988,14 @@ input[type='range']::-moz-range-thumb {
   width: 31px;
   height: 31px;
 }
-.library-sound > span:nth-child(2) {
+.library-add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   flex: 1;
+  min-width: 0;
+  padding: 4px;
+  text-align: left;
 }
 .library-sound strong {
   font-size: 10px;
@@ -930,10 +1003,30 @@ input[type='range']::-moz-range-thumb {
   display: block;
 }
 
-.library-sound > svg {
+.library-add strong {
+  flex: 1;
+}
+.library-add > svg {
   width: 14px;
   color: #a2bb8c;
   flex-shrink: 0;
+}
+.library-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 48px;
+  padding: 7px 4px;
+  border-radius: 5px;
+  color: #b9d59e;
+  font-size: 9px;
+}
+.library-preview:hover,
+.library-preview[aria-pressed='true'] {
+  background: #3c4e30;
+  color: #e0edcf;
 }
 .modal-footnote {
   font-size: 9px;
@@ -1127,20 +1220,8 @@ input[type='range']::-moz-range-thumb {
   }
 }
 @media (min-width: 1450px) {
-  .scene-stage {
-    height: 425px;
-  }
-  .preset-image {
-    height: 96px;
-  }
-  .scene-title h2 {
-    font-size: 57px;
-  }
   .transport {
     margin-bottom: 38px;
-  }
-  .layer-list {
-    max-height: 550px;
   }
   .sound-layer {
     padding-top: 21px;
@@ -1152,7 +1233,7 @@ input[type='range']::-moz-range-thumb {
     padding: 0 30px;
   }
   .workspace {
-    grid-template-columns: minmax(0, 1fr) 330px;
+    grid-template-columns: minmax(0, 1fr) 290px;
     gap: 22px;
   }
   .transport {
@@ -1178,9 +1259,6 @@ input[type='range']::-moz-range-thumb {
     display: block;
     margin-top: 4px;
   }
-  .scene-title h2 {
-    font-size: 43px;
-  }
   .headphone-badge {
     display: none;
   }
@@ -1201,14 +1279,8 @@ input[type='range']::-moz-range-thumb {
   .workspace {
     grid-template-columns: 1fr;
   }
-  .scene-stage {
-    height: 390px;
-  }
   .headphone-badge {
     display: flex;
-  }
-  .scene-title h2 {
-    font-size: 51px;
   }
   .transport-label strong {
     font-size: 12px;
@@ -1222,14 +1294,8 @@ input[type='range']::-moz-range-thumb {
   .preset-info {
     display: flex;
   }
-  .preset-image {
-    height: 100px;
-  }
   .mixer-title {
     padding-top: 23px;
-  }
-  .layer-list {
-    max-height: none;
   }
   .sound-layer {
     padding: 18px 0;
@@ -1298,9 +1364,6 @@ input[type='range']::-moz-range-thumb {
   .page-intro > p {
     display: none;
   }
-  .scene-stage {
-    height: 355px;
-  }
   .scene-topline {
     left: 17px;
     right: 17px;
@@ -1320,9 +1383,6 @@ input[type='range']::-moz-range-thumb {
   .scene-title {
     left: 23px;
     bottom: 76px;
-  }
-  .scene-title h2 {
-    font-size: 43px;
   }
   .scene-title p {
     font-size: 11px;
@@ -1369,9 +1429,6 @@ input[type='range']::-moz-range-thumb {
   .scene-grid {
     gap: 10px;
     grid-template-columns: repeat(2, 1fr);
-  }
-  .preset-image {
-    height: 84px;
   }
   .preset-info {
     padding: 10px;
@@ -1444,7 +1501,10 @@ input[type='range']::-moz-range-thumb {
 }
 /* Compact slider controls shared by loops and sound effects. */
 .sound-layer {
-  padding: 13px 0;
+  padding: 14px;
+  border: 1px solid #344238;
+  border-radius: 8px;
+  background: #1b2821;
 }
 .sound-controls {
   display: grid;
@@ -1491,9 +1551,8 @@ input[type='range']::-moz-range-thumb {
 .live-slider output {
   color: #d4e8bc;
 }
-/* Gold flow marks the values controlled by Auto mode,
-even while paused. */
-.automated-slider input[type='range'] {
+/* Gold flow marks an active Auto mode update; idle controls stay green. */
+.updating-slider input[type='range'] {
   background-image:
     linear-gradient(
       to right,
@@ -1515,7 +1574,7 @@ even while paused. */
     200% 100%;
   animation: gold-track-flow 3s linear infinite;
 }
-.automated-slider input[type='range']::-webkit-slider-thumb {
+.updating-slider input[type='range']::-webkit-slider-thumb {
   background: linear-gradient(110deg, #c7973e, #ffe8a3, #c7973e);
   background-size: 200% 100%;
   box-shadow:
@@ -1523,7 +1582,7 @@ even while paused. */
     0 0 8px #e6bd6140;
   animation: gold-thumb-flow 3s linear infinite;
 }
-.automated-slider input[type='range']::-moz-range-thumb {
+.updating-slider input[type='range']::-moz-range-thumb {
   background: linear-gradient(110deg, #c7973e, #ffe8a3, #c7973e);
   background-size: 200% 100%;
   box-shadow:
@@ -1531,10 +1590,10 @@ even while paused. */
     0 0 8px #e6bd6140;
   animation: gold-thumb-flow 3s linear infinite;
 }
-.automated-slider output {
+.updating-slider output {
   color: #f0d18a;
 }
-.automated-slider .live-label {
+.updating-slider .live-label {
   color: #f0d18a;
   background: #4c3c21;
 }
@@ -1642,6 +1701,7 @@ even while paused. */
 .evolution-control {
   padding: 12px 14px;
   margin-bottom: 16px;
+  max-width: 360px;
 }
 .auto-mode-header {
   display: flex;
@@ -1708,4 +1768,196 @@ even while paused. */
   .sound-controls {
     margin-left: 0;
   }
+}
+
+/* Sound controls lead the page; scenes form a compact secondary column. */
+.top-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0 16px 16px;
+}
+.top-controls > .transport {
+  flex: 1 1 380px;
+  min-width: min(100%, 380px);
+  margin: 0;
+}
+.top-controls > .evolution-control {
+  flex: 0 1 300px;
+  min-width: min(100%, 280px);
+  margin: 0;
+}
+.mixer-tabs button {
+  font-size: 12px;
+}
+.layer-name strong {
+  font-size: 12px;
+}
+.scene-column {
+  min-width: 0;
+}
+.scene-column .scene-badge {
+  font-size: 7px;
+  letter-spacing: 0.8px;
+}
+.scene-column .headphone-badge {
+  font-size: 0;
+}
+.scene-column .headphone-badge svg {
+  width: 16px;
+  height: 16px;
+}
+.scene-column .section-heading h3 {
+  font-size: 19px;
+}
+.scene-column .quiet-label {
+  display: none;
+}
+.scene-column .preset-image {
+  height: 64px;
+}
+.scene-column .preset-info {
+  display: block;
+  padding: 10px;
+}
+.scene-column .preset-info > span {
+  display: block;
+  margin-top: 4px;
+}
+.scene-column .slow-note {
+  margin-top: 18px;
+}
+@media (max-width: 900px) {
+  .scene-column .scene-stage {
+    height: 250px;
+  }
+  .scene-column .scene-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 680px) {
+  .layer-list {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 14px 16px 0;
+  }
+  .mixer-tabs {
+    padding: 0 16px;
+    gap: 14px;
+  }
+  .mixer-tabs button {
+    font-size: 11px;
+  }
+}
+@media (max-width: 560px) {
+  .scene-column .scene-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Only per-sound Auto mode limits use rotary knobs. */
+.auto-knobs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.knob-control {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+.knob-label {
+  font-size: 9px;
+  color: #a7b69e;
+  text-align: center;
+  line-height: 1.4;
+  min-height: 26px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  max-width: 100%;
+}
+.rotary-dial {
+  width: 58px;
+  height: 58px;
+  position: relative;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  border-radius: 50%;
+}
+.rotary-dial:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+.rotary-dial > svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.knob-track {
+  stroke: #45553a;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+.knob-progress {
+  stroke: #bed8a1;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+.knob-face {
+  position: absolute;
+  inset: 8px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #405437, #263421);
+  border: 1px solid #647952;
+  box-shadow:
+    inset 0 1px 2px #d3edac1f,
+    0 2px 5px #0004;
+  pointer-events: none;
+}
+.rotary-dial:hover .knob-face {
+  border-color: #aec88e;
+}
+.knob-pointer {
+  position: absolute;
+  inset: 9px;
+  pointer-events: none;
+}
+.knob-pointer:before {
+  content: '';
+  position: absolute;
+  width: 2px;
+  height: 6px;
+  top: 2px;
+  left: calc(50% - 1px);
+  border-radius: 2px;
+  background: #d9ebbf;
+}
+.knob-value {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: #deebce;
+  pointer-events: none;
+  padding-top: 2px;
+}
+.knob-value small {
+  font-size: 7px;
+  color: #a5bb90;
+  margin-left: 1px;
+}
+.rotary-dial:active {
+  cursor: grabbing;
+}
+.rotary-dial:active .knob-face {
+  background: linear-gradient(145deg, #35492d, #20311c);
 }

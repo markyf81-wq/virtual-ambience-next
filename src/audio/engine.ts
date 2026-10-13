@@ -1,5 +1,6 @@
 import { soundById, type Layer, type Mix, type ChangeFrequency } from '../data';
-export type LiveValues = Record<string, { volume: number; frequency: number }>;
+type AutoValues = { volume: number; frequency: number };
+export type LiveValues = Record<string, AutoValues & { updating: boolean }>;
 type Channel = {
   gain: GainNode;
   sources: Set<AudioBufferSourceNode>;
@@ -11,10 +12,14 @@ type Channel = {
   activityTarget: number;
   activityAt: number;
   activitySilent?: boolean;
+  activityUpdateUntil?: number;
   loopTarget?: number;
   loopFadeEnds?: number;
 };
 const LOOP_AUTO_FADE_SECONDS = 10;
+const AUTO_LOOP_AUDIBLE_THRESHOLD = 10;
+const canAnchorAutoMode = (layer: Layer) =>
+  !layer.muted && layer.max > 0 && soundById.get(layer.soundId)?.kind === 'loop';
 const between = (a: number, b: number) => a + Math.random() * (b - a);
 const wait = (rate: number) =>
   rate > 0 ? Math.max(0.35, (-Math.log(Math.max(0.00001, Math.random())) * 60) / rate) : Infinity;
@@ -41,7 +46,7 @@ export class AmbienceEngine {
   private channels = new Map<string, Channel>();
   private buffers = new Map<string, Promise<AudioBuffer>>();
   private mix?: Mix;
-  private pendingAutoValues = new Map<string, { volume: number; frequency: number }>();
+  private pendingAutoValues = new Map<string, AutoValues>();
   private revision = 0;
   private running = false;
   onEvent?: (id: string) => void;
@@ -141,6 +146,7 @@ export class AmbienceEngine {
         const boundsChanged = layer.minRate !== prev.minRate || layer.maxRate !== prev.maxRate;
         const rateChanged = layer.rate !== prev.rate;
         if (!isAuto || autoChanged || rateChanged) {
+          channel.activityUpdateUntil = undefined;
           channel.activitySilent = false;
           channel.activityRate = startingRate(layer, isAuto);
           channel.activityTarget = channel.activityRate;
@@ -189,6 +195,7 @@ export class AmbienceEngine {
         this.pendingAutoValues.delete(channel.config.id);
       }
     }
+    this.keepLoopAudible();
     this.publishValues();
   }
   private reconcilePendingValues(mix: Mix) {
@@ -205,6 +212,60 @@ export class AmbienceEngine {
       if (!effect && values.volume !== 0)
         values.volume = Math.max(layer.min, Math.min(layer.max, values.volume));
     }
+    this.keepPendingLoopAudible(mix);
+  }
+  private keepPendingLoopAudible(mix: Mix) {
+    if (!mix.evolveEnabled || !this.pendingAutoValues.size) return;
+    const loops = mix.layers.filter(canAnchorAutoMode);
+    if (!loops.length) return;
+    const floor = Math.min(
+      AUTO_LOOP_AUDIBLE_THRESHOLD,
+      Math.max(...loops.map((layer) => layer.max)),
+    );
+    if (
+      loops.some((layer) => {
+        const volume =
+          this.pendingAutoValues.get(layer.id)?.volume ??
+          Math.max(layer.min, Math.min(layer.max, layer.volume));
+        return volume >= floor;
+      })
+    )
+      return;
+    const candidates = loops.filter((layer) => layer.max >= floor);
+    const layer = candidates[Math.floor(Math.random() * candidates.length)];
+    this.pendingAutoValues.set(layer.id, {
+      volume: layer.max,
+      frequency: layer.rate * 5,
+    });
+  }
+  private keepLoopAudible() {
+    if (!this.mix?.evolveEnabled || !this.context || !this.running) return;
+    const loops = [...this.channels.values()].filter((channel) =>
+      canAnchorAutoMode(channel.config),
+    );
+    if (!loops.length) return;
+    const now = this.context.currentTime;
+    const floor = Math.min(
+      AUTO_LOOP_AUDIBLE_THRESHOLD,
+      Math.max(...loops.map((c) => c.config.max)),
+    );
+    // Keep an audible outgoing loop until another has actually faded up.
+    // Normal startup and brief recovery fades are allowed to finish without restarting them.
+    if (
+      loops.some(
+        (c) =>
+          (c.loopTarget ?? 0) >= floor &&
+          (c.gain.gain.value * 100 >= floor - 0.01 || (c.loopFadeEnds ?? now) <= now + 0.3),
+      )
+    )
+      return;
+    const candidates = loops.filter((c) => c.config.max >= floor);
+    const channel = candidates.reduce((loudest, c) =>
+      c.gain.gain.value > loudest.gain.gain.value ? c : loudest,
+    );
+    const audible = channel.gain.gain.value * 100 >= floor - 0.01;
+    this.autoLoopLevel(channel, channel.config.max, audible ? LOOP_AUTO_FADE_SECONDS : 0.3);
+    channel.change = Math.max(channel.change, now + LOOP_AUTO_FADE_SECONDS);
   }
   private publishPendingValues() {
     const values: LiveValues = {};
@@ -212,12 +273,13 @@ export class AmbienceEngine {
       values[id] = {
         volume: Math.round(value.volume * 10) / 10,
         frequency: Math.round(value.frequency * 10) / 10,
+        updating: false,
       };
     this.onValues?.(values);
   }
-  randomiseAuto(mix: Mix) {
+  shuffleAuto(mix: Mix) {
     if (!mix.evolveEnabled) return;
-    const values: LiveValues = {};
+    const values: Record<string, AutoValues> = {};
     this.pendingAutoValues.clear();
     for (const layer of mix.layers) {
       const effect = soundById.get(layer.soundId)?.kind === 'effect';
@@ -231,6 +293,7 @@ export class AmbienceEngine {
       };
       this.pendingAutoValues.set(layer.id, values[layer.id]);
     }
+    this.keepPendingLoopAudible(mix);
     if (this.running && this.context) {
       for (const [id, channel] of this.channels) {
         const value = this.pendingAutoValues.get(id);
@@ -239,17 +302,20 @@ export class AmbienceEngine {
           this.pendingAutoValues.delete(id);
         }
       }
+      this.keepLoopAudible();
       this.publishValues();
     } else {
       this.publishPendingValues();
     }
   }
-  private applyAutoValues(c: Channel, values: { volume: number; frequency: number }) {
+  private applyAutoValues(c: Channel, values: AutoValues) {
     const now = this.context!.currentTime;
     const effect = soundById.get(c.config.soundId)?.kind === 'effect';
     if (effect) {
+      const previousRate = c.activityRate;
       c.activitySilent = values.frequency === 0;
       c.activityRate = c.activitySilent ? 0 : boundedRate(c.config, values.frequency / 5);
+      if (Math.abs(c.activityRate - previousRate) >= 0.01) c.activityUpdateUntil = now + 1;
       c.activityTarget = c.activityRate;
       c.activityAt = now;
       c.next = now + wait(c.activityRate);
@@ -270,10 +336,20 @@ export class AmbienceEngine {
   }
   private publishValues() {
     const values: LiveValues = {};
+    const now = this.context!.currentTime;
     for (const [id, c] of this.channels)
       values[id] = {
         volume: Math.round(c.gain.gain.value * 1000) / 10,
         frequency: Math.round(c.activityRate * 50) / 10,
+        // Highlight active automation, not the wait between automatic passes.
+        updating:
+          Boolean(this.mix?.evolveEnabled) &&
+          !c.config.muted &&
+          (soundById.get(c.config.soundId)?.kind === 'effect'
+            ? Math.abs(c.activityTarget - c.activityRate) >= 0.01 ||
+              now < (c.activityUpdateUntil ?? 0)
+            : now < (c.loopFadeEnds ?? 0) &&
+              Math.abs((c.loopTarget ?? 0) / 100 - c.gain.gain.value) >= 0.0005),
       };
     this.onValues?.(values);
   }
@@ -310,10 +386,10 @@ export class AmbienceEngine {
     c.loopFadeEnds = undefined;
     this.holdLevel(c, now).setTargetAtTime(volume / 100, now, fade);
   }
-  private autoLoopLevel(c: Channel, volume: number) {
+  private autoLoopLevel(c: Channel, volume: number, fade = LOOP_AUTO_FADE_SECONDS) {
     const now = this.context!.currentTime;
     c.loopTarget = volume;
-    c.loopFadeEnds = now + LOOP_AUTO_FADE_SECONDS;
+    c.loopFadeEnds = now + fade;
     this.holdLevel(c, now).linearRampToValueAtTime(volume / 100, c.loopFadeEnds);
   }
   private tick() {
@@ -333,6 +409,7 @@ export class AmbienceEngine {
           c.activityTarget = autoEffectRate(l);
           c.activitySilent = c.activityTarget === 0;
           if (c.activitySilent) {
+            if (c.activityRate >= 0.01) c.activityUpdateUntil = now + 1;
             c.activityRate = 0;
             c.next = Infinity;
           }
@@ -365,6 +442,7 @@ export class AmbienceEngine {
           Math.max(LOOP_AUTO_FADE_SECONDS, changeInterval(l.changeFrequency, this.mix.evolution));
       }
     }
+    this.keepLoopAudible();
     this.publishValues();
   }
   private voice(c: Channel, time: number, preview = false) {

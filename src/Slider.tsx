@@ -8,7 +8,7 @@ type SliderProps = {
   max?: number;
   step?: number;
   live?: boolean;
-  automated?: boolean;
+  updating?: boolean;
   disabled?: boolean;
 };
 
@@ -20,22 +20,23 @@ export default function Slider({
   max = 100,
   step = 1,
   live = false,
-  automated = false,
+  updating = false,
   disabled = false,
 }: SliderProps) {
   const id = useId();
+  const displayValue = Math.round(value);
   const progress = Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100));
 
   return (
     <label
-      className={`slider ${live ? 'live-slider' : ''} ${automated ? 'automated-slider' : ''} ${disabled ? 'disabled-slider' : ''}`}
+      className={`slider ${live ? 'live-slider' : ''} ${updating ? 'updating-slider' : ''} ${disabled ? 'disabled-slider' : ''}`}
       htmlFor={id}
     >
       <span>
         <span>{label}</span>
         <output htmlFor={id} aria-live="off">
           {live && <small className="live-label">Auto</small>}
-          {value}%
+          {displayValue}%
         </output>
       </span>
       <input
@@ -47,7 +48,7 @@ export default function Slider({
         value={value}
         disabled={live || disabled}
         aria-label={label}
-        aria-valuetext={`${value}%${live ? ', controlled by Auto mode' : ''}`}
+        aria-valuetext={`${displayValue}%${live ? ', controlled by Auto mode' : ''}`}
         title={live ? 'Controlled by Auto mode.' : undefined}
         style={{ '--fill': `${progress}%` } as CSSProperties}
         onChange={(event) => onChange(Number(event.target.value))}

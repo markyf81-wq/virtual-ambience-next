@@ -1,8 +1,17 @@
+import { importedSounds } from './importedSounds';
+
 export type ChangeFrequency = 'slow' | 'medium' | 'frequent';
 export type SoundKind = 'loop' | 'effect';
+export type SoundCollection = 'nature' | 'urban' | 'space';
+export const collections: { id: SoundCollection; name: string; icon: string }[] = [
+  { id: 'nature', name: 'Nature', icon: 'leaf' },
+  { id: 'urban', name: 'Urban', icon: 'building' },
+  { id: 'space', name: 'Space', icon: 'orbit' },
+];
 export type Sound = {
   id: string;
   name: string;
+  collection: SoundCollection;
   category: string;
   kind: SoundKind;
   file: string;
@@ -33,16 +42,21 @@ export type Mix = {
   evolution: number;
   evolveEnabled: boolean;
 };
-export const sounds: Sound[] = [
+const natureSounds: Sound[] = [
   ...[
     ['Animals_Cicadas', 'Cicadas', 'Wildlife', 'bug'],
     ['Animals_Crickets', 'Crickets', 'Wildlife', 'bug'],
     ['Animals_Crows', 'Crows', 'Wildlife', 'bird'],
     ['Animals_Frogs', 'Frog chorus', 'Wildlife', 'frog'],
+    ['Animals_Forest-Birds', 'Forest birdsong', 'Birds', 'bird'],
+    ['Animals_Jungle-Night', 'Malaysian jungle at night', 'Wildlife', 'leaf'],
     ['Animals_Night-Bird', 'Night birds', 'Wildlife', 'bird'],
     ['Civilization_Music', 'Distant music', 'Other', 'music'],
+    ['Fire_Fireplace', 'Crackling fire', 'Fire', 'fire'],
+    ['Music_Gongs', 'Layered gongs', 'Other', 'music'],
     ['Nature_Rain-Heavy', 'Heavy rain', 'Weather', 'rain'],
     ['Nature_Rain-Light', 'Gentle rain', 'Weather', 'rain'],
+    ['Nature_Rain-Leaves', 'Rain on leaves', 'Weather', 'rain'],
     ['Nature_River', 'Flowing river', 'Water', 'water'],
     ['Nature_Thunder', 'Rolling thunder', 'Weather', 'storm'],
     ['Nature_Wind', 'Wind in the trees', 'Weather', 'wind'],
@@ -51,6 +65,7 @@ export const sounds: Sound[] = [
     name,
     category,
     icon,
+    collection: 'nature' as const,
     kind: 'loop' as const,
     file: `/audio/loops/${id}.mp3`,
   })),
@@ -77,11 +92,13 @@ export const sounds: Sound[] = [
     name,
     category,
     icon,
+    collection: 'nature' as const,
     kind: 'effect' as const,
     file: `/audio/fx/${id}.mp3`,
   })),
 ];
-export const MAX_LAYERS = 32;
+export const sounds: Sound[] = [...natureSounds, ...importedSounds];
+export const MAX_LAYERS = 64;
 export const soundById = new Map(sounds.map((sound) => [sound.id, sound]));
 export function makeLayer(soundId: string, volume = 45): Layer {
   return {
@@ -102,101 +119,388 @@ export function makeLayer(soundId: string, volume = 45): Layer {
     spatial: soundById.get(soundId)?.kind === 'effect',
   };
 }
-export const scenes = [
+type SceneLayer = [
+  soundId: string,
+  volume: number,
+  settings?: Partial<Omit<Layer, 'id' | 'soundId' | 'volume'>>,
+];
+type Scene = {
+  id: string;
+  name: string;
+  collection: SoundCollection;
+  eyebrow: string;
+  description: string;
+  tag: string;
+  layers: SceneLayer[];
+  allSounds?: boolean;
+};
+
+// Preset frequencies use the same percentages shown by the controls.
+const loopPreset = (
+  soundId: string,
+  volume: number,
+  min: number,
+  max: number,
+  offChance = 8,
+): SceneLayer => [soundId, volume, { min, max, offChance }];
+const effectPreset = (
+  soundId: string,
+  maxVolume: number,
+  frequency: number,
+  maxFrequency: number,
+  offChance = 12,
+  pitch = 5,
+): SceneLayer => [
+  soundId,
+  maxVolume,
+  {
+    effectMin: Math.round(maxVolume * 0.25),
+    effectMax: maxVolume,
+    rate: frequency / 5,
+    minRate: 0,
+    maxRate: maxFrequency / 5,
+    offChance,
+    pitch,
+  },
+];
+
+const natureScenes: Omit<Scene, 'collection'>[] = [
   {
     id: 'forest',
     name: 'Forest dreams',
-    eyebrow: 'A QUIET PLACE TO BEGIN',
-    description: 'A river below. A canopy above. Nothing to hurry for.',
-    tag: 'Grounding',
+    eyebrow: 'FOLLOW THE STREAM',
+    description: 'A flowing stream, soft birdsong, and woodpecker taps beneath the canopy.',
+    tag: 'Woodland',
     layers: [
-      ['Nature_River', 38],
-      ['Nature_Wind', 22],
-      ['Animals_Crickets', 22],
-      ['Bird_Sparrow', 42],
-      ['Bird_Woodpecker', 35],
+      loopPreset('Nature_River', 42, 30, 55, 0),
+      loopPreset('Nature_Wind', 14, 5, 24, 12),
+      loopPreset('Animals_Forest-Birds', 18, 10, 26, 8),
+      effectPreset('Bird_Woodpecker', 38, 8, 16),
+      effectPreset('Animal_Chipmunk', 28, 5, 10, 18),
+      effectPreset('Bird_Sparrow', 26, 5, 10),
     ],
   },
   {
     id: 'storm',
     name: 'Distant storm',
-    eyebrow: 'LET THE WORLD WASH AWAY',
-    description: 'Soft rain, restless trees, and thunder on the horizon.',
-    tag: 'Focus',
+    eyebrow: 'THUNDER ON THE HORIZON',
+    description: 'Rain builds through the trees while cicadas linger and thunder rolls in.',
+    tag: 'Approaching rain',
     layers: [
-      ['Nature_Rain-Light', 55],
-      ['Nature_Wind', 25],
-      ['Thunder_Far', 45],
-      ['Thunder_Crack', 30],
+      loopPreset('Nature_Rain-Light', 55, 15, 70),
+      loopPreset('Nature_Wind', 25, 5, 50),
+      effectPreset('Thunder_Far', 45, 5, 10, 8, 3),
+      effectPreset('Thunder_Crack', 30, 2, 5, 20, 3),
+      loopPreset('Nature_Rain-Heavy', 30, 5, 45),
+      loopPreset('Animals_Cicadas', 30, 8, 46),
     ],
   },
   {
     id: 'dusk',
     name: 'Last light',
-    eyebrow: 'THE DAY SLOWS DOWN',
-    description: 'Golden light fades. The evening chorus takes its place.',
-    tag: 'Unwind',
+    eyebrow: 'EVENING BY THE WATER',
+    description: 'A loon calls across the river as crickets take over from the daytime chorus.',
+    tag: 'Sunset',
     layers: [
-      ['Animals_Cicadas', 25],
-      ['Animals_Crickets', 35],
-      ['Nature_Wind', 20],
-      ['Bird_Loon', 35],
-      ['Animal_Frog_Ribbit', 30],
+      loopPreset('Nature_River', 22, 15, 32, 0),
+      loopPreset('Animals_Crickets', 34, 18, 46, 5),
+      loopPreset('Animals_Cicadas', 12, 0, 22, 25),
+      effectPreset('Bird_Loon', 40, 4, 8, 20, 3),
+      effectPreset('Animal_Frog_Ribbit', 24, 6, 12),
+      effectPreset('Bug_Katydid', 22, 7, 14),
     ],
   },
   {
     id: 'morning',
     name: 'First light',
-    eyebrow: 'A FRESH START',
-    description: 'Birdsong drifts through the trees as the forest wakes.',
-    tag: 'Restore',
+    eyebrow: 'THE WOODS WAKE UP',
+    description:
+      'A morning chorus fills the forest, with scattered crow calls and fluttering wings.',
+    tag: 'Dawn chorus',
     layers: [
-      ['Nature_River', 25],
-      ['Nature_Wind', 22],
-      ['Bird_Sparrow', 48],
-      ['Bird_Eagle', 30],
-      ['Bird_Wing-Flap', 30],
+      loopPreset('Animals_Forest-Birds', 32, 20, 44, 0),
+      loopPreset('Animals_Crows', 12, 5, 20, 15),
+      loopPreset('Nature_Wind', 12, 5, 22, 5),
+      effectPreset('Bird_Sparrow', 30, 8, 16, 8),
+      effectPreset('Bird_Crow', 32, 5, 10, 18, 3),
+      effectPreset('Bird_Fly-Away', 26, 4, 8, 20),
+      effectPreset('Bird_Wing-Flap', 22, 6, 12, 18),
     ],
   },
   {
     id: 'night',
     name: 'After dark',
-    eyebrow: 'SETTLE INTO THE STILLNESS',
-    description: 'Crickets, a distant owl, and the gentle rhythm of night.',
-    tag: 'Rest',
+    eyebrow: 'BENEATH A QUIET SKY',
+    description: 'Night birds and a lone owl break the steady hush of crickets.',
+    tag: 'Moonlit woods',
     layers: [
-      ['Animals_Crickets', 38],
-      ['Animals_Frogs', 22],
-      ['Nature_Wind', 15],
-      ['Bird_Owl', 36],
+      loopPreset('Animals_Crickets', 32, 20, 42, 0),
+      loopPreset('Animals_Night-Bird', 18, 5, 28, 15),
+      loopPreset('Nature_Wind', 10, 0, 18, 20),
+      effectPreset('Bird_Owl', 34, 3, 7, 20, 3),
+      effectPreset('Bug_Ticky', 16, 5, 10, 18),
     ],
   },
   {
     id: 'downpour',
-    name: 'Rain shelter',
-    eyebrow: 'NOWHERE ELSE TO BE',
-    description: 'An enveloping downpour. A small shelter from the day.',
-    tag: 'Deep focus',
+    name: 'Downpour',
+    eyebrow: 'IN THE HEART OF THE STORM',
+    description: 'Heavy rain surrounds you, with low rolling thunder and occasional sharp cracks.',
+    tag: 'Wild weather',
     layers: [
-      ['Nature_Rain-Heavy', 55],
-      ['Nature_Thunder', 18],
-      ['Thunder_Far', 35],
+      loopPreset('Nature_Rain-Heavy', 52, 40, 65, 0),
+      loopPreset('Nature_Rain-Leaves', 20, 10, 28, 10),
+      loopPreset('Nature_Thunder', 22, 10, 34, 12),
+      loopPreset('Nature_Wind', 18, 5, 30, 15),
+      effectPreset('Thunder_Loud', 48, 3, 7, 18, 2),
+      effectPreset('Thunder_Crack', 40, 2, 5, 25, 2),
+      effectPreset('Thunder_Far', 32, 5, 10, 12, 3),
+    ],
+  },
+  {
+    id: 'summer',
+    name: 'Summer afternoon',
+    eyebrow: 'HEAT IN THE TREETOPS',
+    description: 'Cicadas hum in the warm air, punctuated by katydids and wandering birds.',
+    tag: 'Summer',
+    layers: [
+      loopPreset('Animals_Cicadas', 40, 28, 52, 0),
+      loopPreset('Nature_Wind', 12, 0, 20, 25),
+      effectPreset('Bug_Katydid', 28, 10, 18, 8),
+      effectPreset('Bug_Ticky', 22, 12, 20, 8),
+      effectPreset('Bird_Squark', 34, 4, 8, 20, 3),
+      effectPreset('Animal_Chipmunk', 24, 3, 7, 20),
+    ],
+  },
+  {
+    id: 'wetland',
+    name: 'Frog hollow',
+    eyebrow: 'AT THE WATER’S EDGE',
+    description: 'A chorus of frogs gathers beside slow water, with low hoots and a distant loon.',
+    tag: 'Wetland',
+    layers: [
+      loopPreset('Animals_Frogs', 38, 24, 50, 0),
+      loopPreset('Nature_River', 18, 10, 26, 0),
+      loopPreset('Animals_Crickets', 14, 5, 22, 15),
+      effectPreset('Animal_Frog_Hoot', 38, 7, 14, 8, 3),
+      effectPreset('Animal_Frog_Ribbit', 32, 12, 22, 8, 4),
+      effectPreset('Bird_Loon', 28, 2, 5, 25, 3),
+    ],
+  },
+  {
+    id: 'ridge',
+    name: 'High country',
+    eyebrow: 'ROOM TO BREATHE',
+    description: 'Open wind, an eagle overhead, and scattered calls from the ridge.',
+    tag: 'Mountain air',
+    layers: [
+      loopPreset('Nature_Wind', 40, 25, 55, 0),
+      loopPreset('Animals_Crows', 10, 0, 18, 25),
+      effectPreset('Bird_Eagle', 40, 3, 7, 20, 3),
+      effectPreset('Bird_Crow', 26, 3, 6, 25, 3),
+      effectPreset('Bird_Fly-Away', 24, 2, 5, 25),
+      effectPreset('Bird_Wing-Flap', 20, 3, 7, 20),
+    ],
+  },
+  {
+    id: 'campsite',
+    name: 'Campsite evening',
+    eyebrow: 'A LITTLE COMPANY IN THE WOODS',
+    description:
+      'A crackling fire, crickets, and faint music from a nearby camp in the evening air.',
+    tag: 'Distant company',
+    layers: [
+      loopPreset('Fire_Fireplace', 38, 25, 50, 0),
+      loopPreset('Civilization_Music', 18, 5, 26, 18),
+      loopPreset('Animals_Crickets', 26, 15, 38, 0),
+      loopPreset('Nature_Wind', 10, 0, 18, 20),
+      effectPreset('Bird_Owl', 24, 2, 5, 25, 3),
+      effectPreset('Bug_Katydid', 18, 5, 10, 15),
+    ],
+  },
+  {
+    id: 'jungle',
+    name: 'Jungle night',
+    eyebrow: 'ALIVE AFTER DARK',
+    description: 'The Malaysian jungle calls through the darkness as rain brushes the leaves.',
+    tag: 'Tropical night',
+    layers: [
+      loopPreset('Animals_Jungle-Night', 40, 28, 52, 0),
+      loopPreset('Nature_Rain-Leaves', 20, 5, 30, 15),
+      effectPreset('Bug_Katydid', 18, 4, 8, 20),
+      effectPreset('Bug_Ticky', 15, 5, 10, 15),
+    ],
+  },
+  {
+    id: 'sanctuary',
+    name: 'Forest sanctuary',
+    eyebrow: 'LET THE TONES LINGER',
+    description: 'Resonant gongs drift over gentle leaf rain and a breeze through the trees.',
+    tag: 'Quiet reflection',
+    layers: [
+      loopPreset('Music_Gongs', 26, 18, 35, 0),
+      loopPreset('Nature_Rain-Leaves', 22, 12, 30, 0),
+      loopPreset('Nature_Wind', 8, 0, 15, 20),
+      effectPreset('Bird_Sparrow', 18, 2, 5, 25, 3),
     ],
   },
   {
     id: 'all',
-    name: 'All sounds',
+    name: 'All Nature sounds',
     eyebrow: 'THE COMPLETE COLLECTION',
-    description: 'Every loop and sound effect, ready to explore and adjust.',
+    description: 'Every recording in one mix. An open playground for building your own scene.',
     tag: 'Explore',
-    layers: sounds.map((sound) => [sound.id, sound.kind === 'loop' ? 12 : 20]),
+    allSounds: true,
+    layers: natureSounds.map((sound): SceneLayer => [sound.id, sound.kind === 'loop' ? 12 : 20]),
   },
 ];
+const urbanScenes: Omit<Scene, 'collection'>[] = [
+  {
+    id: 'city-morning',
+    name: 'City morning',
+    eyebrow: 'THE NEIGHBOURHOOD WAKES',
+    description: 'Birds and pigeons gather above a quiet city hum, with bells in the distance.',
+    tag: 'Morning streets',
+    layers: [
+      loopPreset('Urban_Birds-City', 32, 20, 44, 0),
+      loopPreset('Urban_Pigeons', 18, 5, 28, 15),
+      loopPreset('Urban_City-Hum', 18, 10, 26, 0),
+      effectPreset('Urban_Bird-Tweet', 26, 5, 10, 15, 3),
+      effectPreset('Urban_Bells', 28, 2, 5, 25, 0),
+    ],
+  },
+  {
+    id: 'market-day',
+    name: 'Market day',
+    eyebrow: 'LIFE ON THE CORNER',
+    description: 'Market chatter spills onto the street as traffic passes and a horn sounds.',
+    tag: 'City bustle',
+    layers: [
+      loopPreset('Urban_Market', 38, 24, 48, 0),
+      loopPreset('Urban_Street', 24, 12, 34, 5),
+      effectPreset('Urban_Horn', 28, 3, 7, 20, 2),
+      effectPreset('Urban_Bells', 22, 1, 4, 30, 0),
+    ],
+  },
+  {
+    id: 'rainy-city',
+    name: 'Rainy streets',
+    eyebrow: 'RAIN ON THE PAVEMENT',
+    description: 'Tyres sweep over wet roads beneath gentle rain and distant highway traffic.',
+    tag: 'After the rain',
+    layers: [
+      loopPreset('Urban_Wet-Road', 36, 24, 48, 0),
+      loopPreset('Urban_Highway', 18, 8, 28, 10),
+      loopPreset('Nature_Rain-Light', 24, 12, 34, 0),
+      effectPreset('Urban_Horn', 22, 2, 5, 25, 2),
+    ],
+  },
+  {
+    id: 'working-city',
+    name: 'Working city',
+    eyebrow: 'A CITY IN MOTION',
+    description: 'Construction and work vehicles fill the day, with a siren passing farther away.',
+    tag: 'Urban activity',
+    layers: [
+      loopPreset('Urban_Construction', 32, 15, 44, 10),
+      loopPreset('Urban_Garbage-Truck', 22, 5, 32, 25),
+      loopPreset('Urban_Fire-Truck', 12, 0, 20, 45),
+      loopPreset('Urban_City-Hum', 18, 10, 26, 0),
+      effectPreset('Urban_Horn', 26, 3, 6, 20, 2),
+    ],
+  },
+  {
+    id: 'all-urban',
+    name: 'All Urban sounds',
+    eyebrow: 'THE CITY COLLECTION',
+    description: 'Every Urban loop and effect, ready to shape into your own city soundscape.',
+    tag: 'Explore',
+    allSounds: true,
+    layers: importedSounds
+      .filter((sound) => sound.collection === 'urban')
+      .map((sound): SceneLayer => [sound.id, sound.kind === 'loop' ? 12 : 20]),
+  },
+];
+
+const spaceScenes: Omit<Scene, 'collection'>[] = [
+  {
+    id: 'orbital-station',
+    name: 'Orbital station',
+    eyebrow: 'LIFE ABOVE THE WORLD',
+    description: 'Station systems hum and breathe around you, punctuated by a quiet signal.',
+    tag: 'Station interior',
+    layers: [
+      loopPreset('Space_Station', 36, 24, 48, 0),
+      loopPreset('Space_Machines-Hum', 18, 8, 28, 5),
+      loopPreset('Space_Hiss', 12, 5, 20, 15),
+      effectPreset('Space_Pulsar', 20, 3, 7, 20, 0),
+    ],
+  },
+  {
+    id: 'starship-cruise',
+    name: 'Starship cruise',
+    eyebrow: 'A LONG WAY FROM HOME',
+    description: 'Engines carry you through cosmic wind while galaxies drift past the windows.',
+    tag: 'Deep-space voyage',
+    layers: [
+      loopPreset('Space_Engine', 36, 24, 48, 0),
+      loopPreset('Space_Wind', 20, 8, 30, 10),
+      loopPreset('Space_Galaxy-Flyby', 16, 0, 26, 25),
+      loopPreset('Space_Solar', 10, 0, 18, 30),
+      effectPreset('Space_Laser', 20, 2, 5, 30, 0),
+    ],
+  },
+  {
+    id: 'event-horizon',
+    name: 'Event horizon',
+    eyebrow: 'AT THE EDGE OF THE UNKNOWN',
+    description: 'A deep black-hole drone, radiation pulses, and faint signals from the dark.',
+    tag: 'Deep space',
+    layers: [
+      loopPreset('Space_Black-Hole', 34, 22, 46, 0),
+      loopPreset('Space_Radiation', 18, 5, 28, 15),
+      loopPreset('Space_Wind', 12, 0, 22, 20),
+      effectPreset('Space_Pulsar', 24, 4, 9, 20, 0),
+    ],
+  },
+  {
+    id: 'alien-signal',
+    name: 'Alien signal',
+    eyebrow: 'SOMETHING OUT THERE',
+    description: 'An unfamiliar craft resonates among shifting galaxy textures and solar flares.',
+    tag: 'Otherworldly',
+    layers: [
+      loopPreset('Space_UFO', 30, 18, 42, 0),
+      loopPreset('Space_Galaxy-Flyby-2', 18, 0, 28, 25),
+      loopPreset('Space_Flare', 12, 0, 22, 30),
+      effectPreset('Space_Laser', 24, 3, 7, 25, 0),
+      effectPreset('Space_Pulsar', 18, 2, 5, 30, 0),
+    ],
+  },
+  {
+    id: 'all-space',
+    name: 'All Space sounds',
+    eyebrow: 'THE SPACE COLLECTION',
+    description: 'Every Space loop and effect, ready to build your own world beyond Earth.',
+    tag: 'Explore',
+    allSounds: true,
+    layers: importedSounds
+      .filter((sound) => sound.collection === 'space')
+      .map((sound): SceneLayer => [sound.id, sound.kind === 'loop' ? 12 : 20]),
+  },
+];
+
+export const scenes: Scene[] = [
+  ...natureScenes.map((scene): Scene => ({ ...scene, collection: 'nature' })),
+  ...urbanScenes.map((scene): Scene => ({ ...scene, collection: 'urban' })),
+  ...spaceScenes.map((scene): Scene => ({ ...scene, collection: 'space' })),
+];
+
 export function sceneMix(id: string): Mix {
   const scene = scenes.find((s) => s.id === id) ?? scenes[0];
-  const layers = scene.layers.map(([sound, volume]) => {
-    const layer = makeLayer(String(sound), Number(volume));
-    if (scene.id === 'all' && soundById.get(layer.soundId)?.kind === 'effect') {
+  const layers = scene.layers.map(([sound, volume, settings]) => {
+    const layer = { ...makeLayer(sound, volume), ...settings };
+    if (scene.allSounds && soundById.get(layer.soundId)?.kind === 'effect') {
       return {
         ...layer,
         effectMin: 0,
@@ -208,7 +512,7 @@ export function sceneMix(id: string): Mix {
         offChance: 8,
       };
     }
-    if (scene.id === 'all' && soundById.get(layer.soundId)?.kind === 'loop') {
+    if (scene.allSounds && soundById.get(layer.soundId)?.kind === 'loop') {
       return { ...layer, min: 5, max: 50 };
     }
     return layer;

@@ -8,6 +8,19 @@ import {
   Wind,
   CloudLightning,
   Music2,
+  Flame,
+  Building,
+  Car,
+  Truck,
+  Hammer,
+  Users,
+  Bell,
+  Rocket,
+  Orbit,
+  Sun,
+  Zap,
+  Radio,
+  Siren,
 } from 'lucide-react';
 
 export default function SoundIcon({ name, size = 20 }: { name: string; size?: number }) {
@@ -20,6 +33,20 @@ export default function SoundIcon({ name, size = 20 }: { name: string; size?: nu
     wind: Wind,
     storm: CloudLightning,
     music: Music2,
+    fire: Flame,
+    leaf: Leaf,
+    building: Building,
+    car: Car,
+    truck: Truck,
+    hammer: Hammer,
+    users: Users,
+    bell: Bell,
+    rocket: Rocket,
+    orbit: Orbit,
+    sun: Sun,
+    zap: Zap,
+    radio: Radio,
+    siren: Siren,
   };
   const Icon = icons[name] ?? AudioLines;
   return <Icon size={size} strokeWidth={1.5} />;
