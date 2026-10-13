@@ -18,7 +18,18 @@ npm run build
 npm run preview
 ```
 
-Import the repository into Vercel as a Vite project. The included configuration builds to `dist` and caches audio assets. No environment variables, database or server functions are required. Vercel Hobby is for personal, non-commercial use. Audio is fetched on demand and decoded buffers are reused for the session; long listening sessions do not repeatedly download loops.
+The public app is hosted at https://markyf81-wq.github.io/virtual-ambience-next/ on GitHub Pages. The GitHub Actions workflow builds and deploys `dist` whenever `main` is pushed; it can also be run manually. Repository Settings → Pages must use GitHub Actions as the source.
+
+For a local production preview matching the GitHub Pages subdirectory:
+
+```sh
+npm run build -- --mode github-pages
+npm run preview
+```
+
+Open `/virtual-ambience-next/` on the preview server. The default development and build commands still serve from `/`, allowing other static hosts or a custom domain. The `github-pages` mode sets Vite's base path, which is also used by all audio URLs. If the repository is renamed, update that path in `vite.config.ts`.
+
+No environment variables, database or server functions are required. Audio is fetched on demand and decoded buffers are reused for the session; long listening sessions do not repeatedly download loops. Shared mixes use the URL fragment and personal saved mixes use browser storage. A future community of published scenes and votes would need a separate backend; GitHub Pages can continue to serve its interface.
 
 ## Included
 

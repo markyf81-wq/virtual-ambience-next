@@ -97,7 +97,10 @@ const natureSounds: Sound[] = [
     file: `/audio/fx/${id}.mp3`,
   })),
 ];
-export const sounds: Sound[] = [...natureSounds, ...importedSounds];
+export const sounds: Sound[] = [...natureSounds, ...importedSounds].map((sound) => ({
+  ...sound,
+  file: `${import.meta.env.BASE_URL}${sound.file.slice(1)}`,
+}));
 export const MAX_LAYERS = 64;
 export const soundById = new Map(sounds.map((sound) => [sound.id, sound]));
 export function makeLayer(soundId: string, volume = 45): Layer {
